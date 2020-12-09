@@ -7,10 +7,8 @@ import random
 #import cProfile
 #import re
 from time import time
+import threading
 import multiprocessing
-
-from Ship import Pos, Ship
-from Cursor import Cursor
 
 def allCoords(x,y,len,rotate):
     if rotate == 0:
@@ -26,27 +24,23 @@ def press(event):
     print('press', event.key)
     stdout.flush()
     if event.key == 'x':
-        board[7][7] = 2
+        #board[7][7] = 2
 #        cmesh.cmap = "Grays"
         ax.clear()
         #im.set_data(renderMap())
-        ax.pcolormesh(renderMap())
-        ax.cmap = "Greys"
+        ax.pcolormesh(renderMap(), cmap="RdYlGn")
+#        print(pcm)
+#        pcm.cmap = plt.get_cmap("Greys")
         fig.canvas.draw()
-
-carrier = Ship(5)
-battleship = Ship(4,0,2)
-cruiser = Ship(3,0,4)
-submarine = Ship(3,0,6)
-destroyer = Ship(2,0,8)
-destroyer.rotate = 2
+#        plt.show()
 
 boardProb = [[0 for _ in range(10)] for _ in range(10)]
 
 board = [[0 for _ in range(10)] for _ in range(10)]
 
-board[2][7] = 2
-board[7][2] = 1
+#board[2][7] = 2
+#board[4][4] = 1
+#board[7][2] = 1
 
 #board[7][7] = 2
 
@@ -68,10 +62,13 @@ def stringGrid(g):
     for x in g:
         f+=''.join(["██" if _==1 else "  " for _ in x]) + "\n"
     return f
-def monteHunt(n, bb, q):
+def monteHunt(n, bb, tr, q):
+    st1 = time()
+    print("Process ID {} spawned!".format(tr))
     freqBoard = [[0 for _ in range(10)] for _ in range(10)]
     hitSpots = []
     tempBoard = bb
+    tries = 0
     for i,a in enumerate(tempBoard):
         for e,s in enumerate(a):
             if s == 2: hitSpots.append((i,e))
@@ -80,6 +77,7 @@ def monteHunt(n, bb, q):
             tempb = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
             #Carrier loop
             while True:
+                tries+=1
                 ca_t = allCoords(int(10*random.random()),int(10*random.random()),5,int(2*random.random())+2)
                 try:
                     if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in ca_t]): continue
@@ -89,6 +87,7 @@ def monteHunt(n, bb, q):
                 break
             #Battleship loop
             while True:
+                tries+=1
                 ba_t = allCoords(int(10*random.random()),int(10*random.random()),4,int(2*random.random())+2)
                 try:
                     if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in ba_t]): continue
@@ -98,6 +97,7 @@ def monteHunt(n, bb, q):
                 break
             #Cruiser loop
             while True:
+                tries+=1
                 cr_t = allCoords(int(10*random.random()),int(10*random.random()),3,int(2*random.random())+2)
                 try:
                     if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in cr_t]): continue
@@ -107,6 +107,7 @@ def monteHunt(n, bb, q):
                 break
             #Submarine loop
             while True:
+                tries+=1
                 su_t = allCoords(int(10*random.random()),int(10*random.random()),3,int(2*random.random())+2)
                 try:
                     if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in su_t]): continue
@@ -116,6 +117,7 @@ def monteHunt(n, bb, q):
                 break
             #Destroyer loop
             while True:
+                tries+=1
                 de_t = allCoords(int(10*random.random()),int(10*random.random()),2,int(2*random.random())+2)
                 try:
                     if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in de_t]): continue
@@ -127,6 +129,9 @@ def monteHunt(n, bb, q):
             break
         for i,e in enumerate(freqBoard): freqBoard[i] = [x + y for x, y in zip(e, tempb[i])]
     q.put(freqBoard)
+    print("Avg. per run: " + str(tries/n))
+#    print('Process ID {} took = {} seconds'.format(tr, time() - st1))
+
     return
 
 def npa(perc):
@@ -142,28 +147,48 @@ def combineBoards(*args):
             retBoard[a][b] = sum([x[a][b] for x in args])
     return retBoard
 
-def renderMap():
+def renderMap(board):
     st = time()
     m = multiprocessing.Manager()
     q = m.Queue()
     pool = multiprocessing.Pool()
-    pool.starmap(monteHunt, [(500, board, q),]*10)
+    print('Time taken = {} seconds'.format(time() - st))
+    tr = range(10)
+    pool.starmap(monteHunt, [(2000, board, i, q) for i in range(8)])
     print('Time taken = {} seconds'.format(time() - st))
     resultTen = q.get()
     pool.close()
     return npa(resultTen)
+def inpt():
+    ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
+    bbb = [[0 for _ in range(10)] for _ in range(10)]
+    while True:
+        inp = input("Input: ")
+        if inp[0].upper() == "H": bbb[10-int(inp[2])][ltn[inp[1]]] = 2
+        elif inp[0].upper() == "M": bbb[10-int(inp[2])][ltn[inp[1]]] = 1
+        print(inp[0])
+        ax.clear()
+        print("f")
+        ax.pcolormesh(renderMap(bbb), cmap="RdYlGn")
+        print("g")
+        plt.draw()
+        print("h")
+
 
 if __name__=="__main__":
-    board[7][8] = 2
-    numpyTen = renderMap()
+    #board[7][8] = 2
+    numpyTen = renderMap([[0 for _ in range(10)] for _ in range(10)])
+
     matplotlib.rcParams['toolbar'] = 'None'
     fig, ax = plt.subplots()
 
-    fig.canvas.mpl_connect('key_press_event', press)
+    #fig.canvas.mpl_connect('key_press_event', press)
 
-    ax.pcolormesh(numpyTen,cmap = 'RdYlGn')
+    pcm = ax.pcolormesh(numpyTen,cmap = 'RdYlGn')
     ax.axes.get_xaxis().set_visible(False)
     ax.axes.get_yaxis().set_visible(False)
     fig.tight_layout()
     fig.canvas.set_window_title('Probability heatmap')
+    x = threading.Thread(target=inpt, args=())
+    x.start()
     plt.show()
