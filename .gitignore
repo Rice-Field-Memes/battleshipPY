@@ -4,3 +4,4 @@ test.py
 testmpl.py
 client.py
 server.py
+permutationCalcGPU_oldcheck.py

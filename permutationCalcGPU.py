@@ -4,20 +4,19 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import random
+from random import getrandbits
 #import cProfile
 #import re
+import time
 from time import time
 import threading
 import multiprocessing
+from numba import jit, cuda
 
 def allCoords(x,y,len,rotate):
-    if rotate == 0:
-        return [(x,a+1) for a in range(y-len,y)][::-1]
-    elif rotate == 1:
-        return [(a+1,y) for a in range(x-len,x)][::-1]
-    elif rotate == 2:
+    if rotate:
         return [(x,a) for a in range(y,y+len)]
-    elif rotate == 3:
+    else:
         return [(a,y) for a in range(x,x+len)]
 
 def press(event):
@@ -62,78 +61,51 @@ def stringGrid(g):
     for x in g:
         f+=''.join(["██" if _==1 else "  " for _ in x]) + "\n"
     return f
-def monteHunt(n, bb, tr, q):
-    st1 = time()
+def shipLoop(len,occupied):
+    while True:
+        sh_t = allCoords(int(10*random.random()),int(10*random.random()),len,not getrandbits(1))
+        if not True in [c in [x for x in occupied for x in x] or c[0]>9 or c[1]>9 for c in sh_t]: return sh_t
+def monteHunt(n, bb, tr):
+    # n: recursions, bb: board, 
+#    st1 = time.time()
     #print("Process ID {} spawned!".format(tr))
     freqBoard = [[0 for _ in range(10)] for _ in range(10)]
     hitSpots = []
+    occupied = []
     tempBoard = bb
+    lenOrder = [5,4,3,3,2]
     tries = 0
     for i,a in enumerate(tempBoard):
         for e,s in enumerate(a):
             if s == 2: hitSpots.append((i,e))
+            elif s == 1: occupied.append([(i,e)])
     for x in range(n):
         while True:
-            tempb = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
-            #Carrier loop
-            while True:
+            if x%250==0: print(x)
+
+            #tempb = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
+            tempOccupied = list(occupied)
+            
+            #Appending each individually is necessary, as each one needs the most recent occupied coordintes, cannot be done on one line
+            tempOccupied.append(shipLoop(5,tempOccupied))
+            tempOccupied.append(shipLoop(4,tempOccupied))
+            tempOccupied.append(shipLoop(3,tempOccupied))
+            tempOccupied.append(shipLoop(3,tempOccupied))
+            tempOccupied.append(shipLoop(2,tempOccupied))
+            
+            while not all([elem in [x for x in tempOccupied for x in x] for elem in hitSpots]):
+                rn = int(5*random.random())
+                tempOccupied[rn] = shipLoop(lenOrder[rn],tempOccupied)
                 tries+=1
-                ca_t = allCoords(int(10*random.random()),int(10*random.random()),5,int(2*random.random())+2)
-                try:
-                    if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in ca_t]): continue
-                except:
-                    continue
-                for x,y in ca_t: tempb[x][y]=1
-                break
-            #Battleship loop
-            while True:
-                tries+=1
-                ba_t = allCoords(int(10*random.random()),int(10*random.random()),4,int(2*random.random())+2)
-                try:
-                    if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in ba_t]): continue
-                except:
-                    continue
-                for x,y in ba_t: tempb[x][y]=1
-                break
-            #Cruiser loop
-            while True:
-                tries+=1
-                cr_t = allCoords(int(10*random.random()),int(10*random.random()),3,int(2*random.random())+2)
-                try:
-                    if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in cr_t]): continue
-                except:
-                    continue
-                for x,y in cr_t: tempb[x][y]=1
-                break
-            #Submarine loop
-            while True:
-                tries+=1
-                su_t = allCoords(int(10*random.random()),int(10*random.random()),3,int(2*random.random())+2)
-                try:
-                    if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in su_t]): continue
-                except:
-                    continue
-                for x,y in su_t: tempb[x][y]=1
-                break
-            #Destroyer loop
-            while True:
-                tries+=1
-                de_t = allCoords(int(10*random.random()),int(10*random.random()),2,int(2*random.random())+2)
-                try:
-                    if not all([tempb[c[0]][c[1]]==0 and tempBoard[c[0]][c[1]]!=1 for c in de_t]): continue
-                except:
-                    continue
-                for x,y in de_t: tempb[x][y]=1
-                break
-            if not all([tempb[x][y]==1 for x,y in hitSpots]): continue
             break
-        for i,e in enumerate(freqBoard): freqBoard[i] = [x + y for x, y in zip(e, tempb[i])]
-    print(tries/n)
-    q.put(freqBoard)
+        #if x==0: print(tempOccupied)
+        for a,b in [e for e in tempOccupied for e in e]: freqBoard[a][b]+=1
+#    q.put(freqBoard)
     #print("Avg. per run: " + str(tries/n))
 #    print('Process ID {} took = {} seconds'.format(tr, time() - st1))
-
-    return
+    #print(freqBoard)
+    print(tries / n)
+    return freqBoard
 
 def npa(perc):
     pMax = max([x for x in perc for x in x])
@@ -152,17 +124,9 @@ def combineBoards(*args):
 
 def renderMap(board):
     st = time()
-    m = multiprocessing.Manager()
-    q = m.Queue()
-    pool = multiprocessing.Pool()
-    #print('Time taken = {} seconds'.format(time() - st))
-    tr = range(8)
-    pool.starmap(monteHunt, [(2500, board, i, q) for i in range(8)])
+    
+    resultTen = monteHunt(20000, board, 1)
     print('Time taken = {} seconds'.format(time() - st))
-#    resultTen = q.get()
-    resultTen = combineBoards([q.get() for _ in range(q.qsize())])
-    #print(resultTen)
-    pool.close()
     return npa(resultTen)
 def inpt():
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
