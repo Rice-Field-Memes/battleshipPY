@@ -14,6 +14,7 @@ from time import time
 import threading
 import multiprocessing
 from numba import jit, cuda
+from numba.typed import List
 import colorama
 colorama.init()
 os.system("cls")
@@ -60,7 +61,7 @@ def stringGrid(g):
     for x in g:
         f+=''.join(["██" if _==1 else "  " for _ in x]) + "\n"
     return f
-@jit(nopython=True)
+@jit(nopython=True,fastmath=True)
 def shipLoop(len,occupied):
     shouldRun = True
     while shouldRun:
@@ -70,18 +71,16 @@ def shipLoop(len,occupied):
         shouldRun = True in [c in [x for x in occupied for x in x] or c[0]>9 or c[1]>9 for c in sh_t]
     return sh_t
 
-@jit(nopython=True)
-def monteHunt(n, bb, tr):
+@jit(nopython=True,fastmath=True)
+def monteHunt(n, bb, ships):
     # n: recursions, bb: board, 
     #st1 = time()
     #print("Process ID {} spawned!".format(tr))
     freqBoard = [[0 for _ in range(10)] for _ in range(10)]
     hitSpots = []
     occupied = []
-    tempBoard = bb
-    lenOrder = [5,4,3,3,2]
     tries = 0
-    for i,a in enumerate(tempBoard):
+    for i,a in enumerate(bb):
         for e,s in enumerate(a):
             if s == 2: hitSpots.append((i,e))
             elif s == 1: occupied.append([(i,e)])
@@ -97,11 +96,7 @@ def monteHunt(n, bb, tr):
             #if x == 0: print(tempOccupied)
             
             #Appending each individually is necessary, as each one needs the most recent occupied coordintes, cannot be done on one line
-            tempOccupied.append(shipLoop(5,tempOccupied))
-            tempOccupied.append(shipLoop(4,tempOccupied))
-            tempOccupied.append(shipLoop(3,tempOccupied))
-            tempOccupied.append(shipLoop(3,tempOccupied))
-            tempOccupied.append(shipLoop(2,tempOccupied))
+            for s in ships: tempOccupied+=[shipLoop(s,tempOccupied)]
 
             tries+=1
             #List of if each hitSpot has a place in tempOccupied, should not be false in it
@@ -114,8 +109,7 @@ def monteHunt(n, bb, tr):
 #    q.put(freqBoard)
     #print("Avg. per run: " + str(tries/n))
     #print('Process took = {} seconds'.format(time() - st1))
-    print("Average tries per recursion: {}".format(tries / n))
-    return freqBoard
+    return freqBoard, tries/n
 
 def npa(perc):
     pMax = max([x for x in perc for x in x])
@@ -132,37 +126,45 @@ def combineBoards(*args):
             retBoard[a][b] = sum([x[a][b] for x in args[0]])
     return retBoard
 
-def renderMap(board):
+def renderMap(board, liveShips=[5,4,3,3,2]):
     st = time()
-    
-    resultTen = monteHunt(20000, board, 1)
+    resultTen,tpn = monteHunt(20000, board, List(liveShips))
     print('Time taken = {} seconds'.format(time() - st))
+    print("Average tries per recursion: {}".format(tpn))
     return npa(resultTen)
+
 def inpt():
+    plt.show(block=False)
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
     bbb = np.zeros((10,10))
     shotCoords = []
+    liveShips = [5,4,3,3,2]
     #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
     #plt.draw()
     while True:
         inp = input("Input: ")
-        if inp == "q": exit()
-        if inp[0].upper() == "H": bbb[10-int(inp[2])][ltn[inp[1].upper()]] = 2
-        elif inp[0].upper() == "M": bbb[10-int(inp[2])][ltn[inp[1].upper()]] = 1
-        else: continue
+        if inp.upper() == "GO" or inp.upper() == "":
 #        print(inp[0])
-        shotCoords.append((10-int(inp[2]),ltn[inp[1].upper()]))
-        boardRendered = renderMap(bbb)
-        for x,y in shotCoords: boardRendered[x][y] = 0
+            
+            boardRendered = renderMap(bbb,liveShips)
+            for x,y in shotCoords: boardRendered[x][y] = 0
 
-        #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
-        boardRendered = np.array(boardRendered)
-        ax.pcolormesh(boardRendered, cmap="hot")
+            #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
+            boardRendered = np.array(boardRendered)
+            ax.pcolormesh(boardRendered, cmap="hot")
         
-        #fig.canvas.draw()
-        plt.draw()
-        maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
-        print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+            #fig.canvas.draw()
+            plt.draw()
+            maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
+            print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+            continue
+        elif inp[0].upper() == "S":
+            liveShips.remove(int(inp[1]))
+            continue
+        elif inp[0].upper() == "H": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 2
+        elif inp[0].upper() == "M": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 1
+        elif inp == "q": exit()
+        shotCoords.append((10-int(inp[2:]),ltn[inp[1].upper()]))
 
 
 if __name__=="__main__":
@@ -179,6 +181,4 @@ if __name__=="__main__":
     ax.axes.get_yaxis().set_visible(False)
     fig.tight_layout()
     fig.canvas.set_window_title('Probability heatmap')
-    x = threading.Thread(target=inpt, args=())
-    x.start()
-    plt.show()
+    inpt()
