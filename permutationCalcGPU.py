@@ -1,8 +1,10 @@
 from sys import stdout
+import os
 
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 import random
 from random import getrandbits
 #import cProfile
@@ -12,6 +14,9 @@ from time import time
 import threading
 import multiprocessing
 from numba import jit, cuda
+import colorama
+colorama.init()
+os.system("cls")
 
 def allCoords(x,y,len,rotate):
     if rotate:
@@ -23,15 +28,9 @@ def press(event):
     print('press', event.key)
     stdout.flush()
     if event.key == 'x':
-        #board[7][7] = 2
-#        cmesh.cmap = "Grays"
         ax.clear()
-        #im.set_data(renderMap())
         ax.pcolormesh(renderMap(), cmap="Greys")
-#        print(pcm)
-#        pcm.cmap = plt.get_cmap("Greys")
         fig.canvas.draw()
-#        plt.show()
 
 boardProb = [[0 for _ in range(10)] for _ in range(10)]
 
@@ -61,13 +60,20 @@ def stringGrid(g):
     for x in g:
         f+=''.join(["██" if _==1 else "  " for _ in x]) + "\n"
     return f
+@jit(nopython=True)
 def shipLoop(len,occupied):
-    while True:
-        sh_t = allCoords(int(10*random.random()),int(10*random.random()),len,not getrandbits(1))
-        if not True in [c in [x for x in occupied for x in x] or c[0]>9 or c[1]>9 for c in sh_t]: return sh_t
+    shouldRun = True
+    while shouldRun:
+        #sh_t = allCoords(int(10*random.random()),int(10*random.random()),len,not getrandbits(1))
+        x,y = int(10*random.random()), int(10*random.random())
+        sh_t = [(x,a) for a in range(y,y+len)] if not getrandbits(1) else [(a,y) for a in range(x,x+len)]
+        shouldRun = True in [c in [x for x in occupied for x in x] or c[0]>9 or c[1]>9 for c in sh_t]
+    return sh_t
+
+@jit(nopython=True)
 def monteHunt(n, bb, tr):
     # n: recursions, bb: board, 
-#    st1 = time.time()
+    #st1 = time()
     #print("Process ID {} spawned!".format(tr))
     freqBoard = [[0 for _ in range(10)] for _ in range(10)]
     hitSpots = []
@@ -79,12 +85,16 @@ def monteHunt(n, bb, tr):
         for e,s in enumerate(a):
             if s == 2: hitSpots.append((i,e))
             elif s == 1: occupied.append([(i,e)])
+
     for x in range(n):
-        while True:
-            if x%250==0: print(x)
+        sr = True
+        while sr:
+            #Hitspots: Each tile that has a hit attack, all must be in tempOccupied, if any
+            #Tempoccupied: List of all occupied coordinates, after each recursion is set to missed attacks
 
             #tempb = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
             tempOccupied = list(occupied)
+            #if x == 0: print(tempOccupied)
             
             #Appending each individually is necessary, as each one needs the most recent occupied coordintes, cannot be done on one line
             tempOccupied.append(shipLoop(5,tempOccupied))
@@ -92,19 +102,19 @@ def monteHunt(n, bb, tr):
             tempOccupied.append(shipLoop(3,tempOccupied))
             tempOccupied.append(shipLoop(3,tempOccupied))
             tempOccupied.append(shipLoop(2,tempOccupied))
-            
-            while not all([elem in [x for x in tempOccupied for x in x] for elem in hitSpots]):
-                rn = int(5*random.random())
-                tempOccupied[rn] = shipLoop(lenOrder[rn],tempOccupied)
-                tries+=1
-            break
-        #if x==0: print(tempOccupied)
+
+            tries+=1
+            #List of if each hitSpot has a place in tempOccupied, should not be false in it
+            #If it is all true, each hit spot has been taken, should stop looping
+            #Will return false if false in list, meaning it is not all true
+            sr = False in [elem in [x for x in tempOccupied for x in x] for elem in hitSpots]
+        #print("e")
+        #if x==0: print(occupied)
         for a,b in [e for e in tempOccupied for e in e]: freqBoard[a][b]+=1
 #    q.put(freqBoard)
     #print("Avg. per run: " + str(tries/n))
-#    print('Process ID {} took = {} seconds'.format(tr, time() - st1))
-    #print(freqBoard)
-    print(tries / n)
+    #print('Process took = {} seconds'.format(time() - st1))
+    print("Average tries per recursion: {}".format(tries / n))
     return freqBoard
 
 def npa(perc):
@@ -130,20 +140,26 @@ def renderMap(board):
     return npa(resultTen)
 def inpt():
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
-    bbb = [[0 for _ in range(10)] for _ in range(10)]
+    bbb = np.zeros((10,10))
     shotCoords = []
+    #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
+    #plt.draw()
     while True:
         inp = input("Input: ")
+        if inp == "q": exit()
         if inp[0].upper() == "H": bbb[10-int(inp[2])][ltn[inp[1].upper()]] = 2
         elif inp[0].upper() == "M": bbb[10-int(inp[2])][ltn[inp[1].upper()]] = 1
+        else: continue
 #        print(inp[0])
-        ax.clear()
         shotCoords.append((10-int(inp[2]),ltn[inp[1].upper()]))
         boardRendered = renderMap(bbb)
         for x,y in shotCoords: boardRendered[x][y] = 0
+
         #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
         boardRendered = np.array(boardRendered)
         ax.pcolormesh(boardRendered, cmap="hot")
+        
+        #fig.canvas.draw()
         plt.draw()
         maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
         print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
@@ -151,7 +167,7 @@ def inpt():
 
 if __name__=="__main__":
     #board[7][8] = 2
-    numpyTen = renderMap([[0 for _ in range(10)] for _ in range(10)])
+    numpyTen = renderMap(np.zeros((10,10)))
 
     matplotlib.rcParams['toolbar'] = 'None'
     fig, ax = plt.subplots()
