@@ -4,6 +4,7 @@ import os
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import colors
 matplotlib.use('TkAgg')
 import random
 from random import getrandbits
@@ -83,7 +84,7 @@ def monteHunt(n, bb, ships):
     for i,a in enumerate(bb):
         for e,s in enumerate(a):
             if s == 2: hitSpots.append((i,e))
-            elif s == 1: occupied.append([(i,e)])
+            elif s == 1 or s == 3: occupied.append([(i,e)])
 
     for x in range(n):
         sr = True
@@ -91,9 +92,7 @@ def monteHunt(n, bb, ships):
             #Hitspots: Each tile that has a hit attack, all must be in tempOccupied, if any
             #Tempoccupied: List of all occupied coordinates, after each recursion is set to missed attacks
 
-            #tempb = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
             tempOccupied = list(occupied)
-            #if x == 0: print(tempOccupied)
             
             #Appending each individually is necessary, as each one needs the most recent occupied coordintes, cannot be done on one line
             for s in ships: tempOccupied+=[shipLoop(s,tempOccupied)]
@@ -103,10 +102,7 @@ def monteHunt(n, bb, ships):
             #If it is all true, each hit spot has been taken, should stop looping
             #Will return false if false in list, meaning it is not all true
             sr = False in [elem in [x for x in tempOccupied for x in x] for elem in hitSpots]
-        #print("e")
-        #if x==0: print(occupied)
         for a,b in [e for e in tempOccupied for e in e]: freqBoard[a][b]+=1
-#    q.put(freqBoard)
     #print("Avg. per run: " + str(tries/n))
     #print('Process took = {} seconds'.format(time() - st1))
     return freqBoard, tries/n
@@ -119,8 +115,6 @@ def npa(perc):
 
 def combineBoards(*args):
     retBoard = [[0 for _ in range(10)] for _ in range(10)]
-#    print("EEEEEEEEEEEEEEEEE")
-#    print(args)
     for a in range(10):
         for b in range(10):
             retBoard[a][b] = sum([x[a][b] for x in args[0]])
@@ -133,15 +127,45 @@ def renderMap(board, liveShips=[5,4,3,3,2]):
     print("Average tries per recursion: {}".format(tpn))
     return npa(resultTen)
 
+def readSave(inp):
+    if inp != "":
+
+        #TEST: 0000000000000000000000000000000000000000000020000000000000000000000000000000000010000000000000000000_44-80_54332
+        interpretParts = inp.split('_')
+        if len(interpretParts) != 3: return False
+        #Board
+        boardArray = [list(interpretParts[0][x*10:(x+1)*10]) for x in range(10)]
+        boardArray = np.array([list(map(lambda y: int(y), x)) for x in boardArray])
+
+        #Shotcoords
+        shotCoords = [(int(x[0]),int(x[1])) for x in interpretParts[1].split("-")]
+
+        #LiveShips
+        liveShips = [int(x) for x in interpretParts[2]]
+
+        return boardArray, shotCoords, liveShips
+    else: return False
 def inpt():
     plt.show(block=False)
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
+    #Board
+    #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
     bbb = np.zeros((10,10))
     shotCoords = []
     liveShips = [5,4,3,3,2]
+    shots = 0
     #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
     #plt.draw()
+    inp = input("load save? ")
+    rs = readSave(inp)
+    
+    if rs != False:
+        bbb,shotCoords,liveShips = rs
+        
     while True:
+        if liveShips == []:
+            print("You win!\n{} rounds!".format(shots))
+        print("Round " + str(shots))
         inp = input("Input: ")
         if inp.upper() == "GO" or inp.upper() == "":
 #        print(inp[0])
@@ -151,6 +175,7 @@ def inpt():
 
             #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
             boardRendered = np.array(boardRendered)
+
             ax.pcolormesh(boardRendered, cmap="hot")
         
             #fig.canvas.draw()
@@ -159,26 +184,46 @@ def inpt():
             print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
             continue
         elif inp[0].upper() == "S":
-            liveShips.remove(int(inp[1]))
+            if len(inp) == 2:
+                liveShips.remove(int(inp[1]))
+            else: print("ERROR")
             continue
         elif inp[0].upper() == "H": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 2
         elif inp[0].upper() == "M": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 1
-        elif inp == "q": exit()
-        shotCoords.append((10-int(inp[2:]),ltn[inp[1].upper()]))
+        elif inp[0].upper() == "R": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 3
+        elif inp == "q": return "{0}_{1}_{2}".format(''.join([str(int(x)) for x in bbb for x in x]),'-'.join([str(x[0])+str(x[1]) for x in shotCoords]),''.join(str(x) for x in liveShips))
+        """
+        BBB is converted to 1d string, each character representing place as number
+        shotCoords is split by -, numbers are put next to eachother as 10 is not used by coord system
+        liveships is string of numbers representing sizes
+        """
+        recentShot = (10-int(inp[2:]),ltn[inp[1].upper()])
+        shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        plt.draw()
+        if not recentShot in shotCoords:
+            shotCoords.append((10-int(inp[2:]),ltn[inp[1].upper()]))
+            shots+=1
 
 
 if __name__=="__main__":
     #board[7][8] = 2
+    shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4],["Blue", "Red", "Lime", "Yellow"])
+
     numpyTen = renderMap(np.zeros((10,10)))
 
+
     matplotlib.rcParams['toolbar'] = 'None'
-    fig, ax = plt.subplots()
+    fig, (ax, shotax) = plt.subplots(1,2,figsize=(13,6))
 
     #fig.canvas.mpl_connect('key_press_event', press)
-
     pcm = ax.pcolormesh(numpyTen,cmap = 'hot')
     ax.axes.get_xaxis().set_visible(False)
     ax.axes.get_yaxis().set_visible(False)
     fig.tight_layout()
+
+    shotpcm = shotax.pcolormesh(np.zeros((10,10)), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+    shotax.axes.get_xaxis().set_visible(False)
+    shotax.axes.get_yaxis().set_visible(False)
+
     fig.canvas.set_window_title('Probability heatmap')
-    inpt()
+    print(inpt())
