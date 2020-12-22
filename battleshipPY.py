@@ -2,6 +2,7 @@ from sys import stdout
 
 import pyglet
 from pyglet.window import key, mouse
+import numpy as np
 
 from Ship import Pos, Ship
 from Cursor import Cursor
@@ -107,8 +108,10 @@ def on_key_press(symbol, modifiers):
         elif ships[cursor.sel].grot==3: ships[cursor.sel].setGP(cursor.x-ships[cursor.sel].cursOnLine,cursor.y)
         elif ships[cursor.sel].grot==0: ships[cursor.sel].setGP(cursor.x,cursor.y+ships[cursor.sel].cursOnLine)
         elif ships[cursor.sel].grot==2: ships[cursor.sel].setGP(cursor.x,cursor.y-ships[cursor.sel].cursOnLine)
-    if symbol == key.Z and cursor.sel != -1:
+    if symbol == key.Z:
         game.debug = not game.debug
+        with open("boardsave","w") as file1:
+            file1.write('='.join(['-'.join([str(s[0])+str(s[1]) for s in e.allCoords()]) for e in ships]))
     [s.update() for s in ships]
     if cursor.sel!=-1:
         des = ships[cursor.sel]

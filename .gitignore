@@ -7,3 +7,5 @@ server.py
 permutationCalcGPU_oldcheck.py
 realPermutationCalcGPU.py
 *.conf
+boardsave
+trytime.csv

@@ -25,13 +25,38 @@ def allCoords(x,y,len,rotate):
     else:
         return [(a,y) for a in range(x,x+len)]
 
+def onclick(event):
+    ix, iy = event.xdata, event.ydata
+    global shotCoords
+    global bbb
+    if event.button == 1:
+        if not (int(iy),int(ix)) in shotCoords:
+            shotCoords.append((int(iy),int(ix)))
+        bbb[int(iy)][int(ix)] = 2
+        shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        plt.draw()
+    elif event.button == 3:
+        if not (int(iy),int(ix)) in shotCoords:
+            shotCoords.append((int(iy),int(ix)))
+        bbb[int(iy)][int(ix)] = 1
+        shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        plt.draw()
+
+
+
 def press(event):
     print('press', event.key)
     stdout.flush()
+    ix, iy = event.xdata, event.ydata
+    global shotCoords
+    global bbb
     if event.key == 'x':
-        ax.clear()
-        ax.pcolormesh(renderMap(), cmap="Greys")
-        fig.canvas.draw()
+        if (int(iy),int(ix)) in shotCoords:
+            shotCoords.remove((int(iy),int(ix)))
+        print("{}, {}".format(ix,iy))
+        bbb[int(iy)][int(ix)] = 0
+        shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        plt.draw()
 
 boardProb = [[0 for _ in range(10)] for _ in range(10)]
 
@@ -147,8 +172,9 @@ def inpt():
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
     #Board
     #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
-    bbb = np.zeros((10,10))
-    shotCoords = []
+    global bbb
+    global shotCoords
+
     liveShips = [5,4,3,3,2]
     shots = 0
     #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
@@ -207,12 +233,15 @@ if __name__=="__main__":
     shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4],["Blue", "Red", "Lime", "Yellow"])
 
     numpyTen = renderMap(np.zeros((10,10)))
-
+    shotCoords = []
+    bbb = np.zeros((10,10))
 
     matplotlib.rcParams['toolbar'] = 'None'
     fig, (ax, shotax) = plt.subplots(1,2,figsize=(13,6))
 
-    #fig.canvas.mpl_connect('key_press_event', press)
+    fig.canvas.mpl_connect('key_press_event', press)
+    fig.canvas.mpl_connect('button_press_event', onclick)
+
     pcm = ax.pcolormesh(numpyTen,cmap = 'hot')
     ax.axes.get_xaxis().set_visible(False)
     ax.axes.get_yaxis().set_visible(False)

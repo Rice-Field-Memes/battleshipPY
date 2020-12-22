@@ -1,3 +1,4 @@
+import sys
 from sys import stdout
 import os
 
@@ -6,32 +7,18 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import colors
 matplotlib.use('Qt5agg')
-
 import random
 from random import getrandbits
 #import cProfile
 #import re
-from time import time
+from time import time,sleep
 from numba import jit, cuda
 from numba.typed import List
 import colorama
 
+from Ship import Ship
 colorama.init()
 os.system("cls")
-
-def allCoords(x,y,len,rotate):
-    if rotate:
-        return [(x,a) for a in range(y,y+len)]
-    else:
-        return [(a,y) for a in range(x,x+len)]
-
-def press(event):
-    print('press', event.key)
-    stdout.flush()
-    if event.key == 'x':
-        ax.clear()
-        ax.pcolormesh(renderMap(), cmap="Greys")
-        fig.canvas.draw()
 
 boardProb = [[0 for _ in range(10)] for _ in range(10)]
 
@@ -42,6 +29,11 @@ board = [[0 for _ in range(10)] for _ in range(10)]
 #board[7][2] = 1
 
 #board[7][7] = 2
+def boardFromCoords(coords):
+    na = np.zeros((10,10))
+    for x,y in [e for e in coords for e in e]:
+        na[x][y] = 1
+    return na
 
 def calcShip(len):
     for x in range(10):
@@ -122,11 +114,12 @@ def renderMap(board, liveShips=[5,4,3,3,2]):
     resultTen,tpn = monteHunt(20000, board, List(liveShips))
     print('Time taken = {} seconds'.format(time() - st))
     print("Average tries per recursion: {}".format(tpn))
+    global allRuns
+    allRuns.append((time()-st,tpn))
     return npa(resultTen)
 
 def readSave(inp):
     if inp != "":
-
         #TEST: 0000000000000000000000000000000000000000000020000000000000000000000000000000000010000000000000000000_44-80_54332
         interpretParts = inp.split('_')
         if len(interpretParts) != 3: return False
@@ -142,85 +135,105 @@ def readSave(inp):
 
         return boardArray, shotCoords, liveShips
     else: return False
+
+def readFileSave(filecont):
+    return [[(int(b[0]),int(b[1])) for b in a.split('-')] for a in filecont.split('=')]
+
+def fixCoords(coords):
+    return [list(map(lambda xy: (xy[1],xy[0]), e)) for e in coords]
+
 def inpt():
-    plt.show(block=False)
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
     #Board
     #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
+    with open("boardsave","r") as file1:
+        hiddenShips = fixCoords(readFileSave(file1.read()))
+
+    if mplo:
+        boardpcm = boardax.pcolormesh(boardFromCoords(hiddenShips), cmap=plt.get_cmap("Greys"), edgecolors="k", linewidths=1)
+        plt.show(block=False)
     bbb = np.zeros((10,10))
     shotCoords = []
     liveShips = [5,4,3,3,2]
     shots = 0
     #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
     #plt.draw()
-    inp = input("load save? ")
-    rs = readSave(inp)
-    
-    if rs != False:
-        bbb,shotCoords,liveShips = rs
-        
     while True:
         if liveShips == []:
-            print("You win!\n{} rounds!".format(shots))
-        print("Round " + str(shots))
-        inp = input("Input: ")
-        if inp.upper() == "GO" or inp.upper() == "":
+            if mplo:
+                shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+                plt.draw()
+                plt.pause(0.01)
+            print("\nYou win!\n{} rounds!".format(shots))
+            return
+        print("\nRound " + str(shots))
 #        print(inp[0])
-            
-            boardRendered = renderMap(bbb,liveShips)
-            for x,y in shotCoords: boardRendered[x][y] = 0
+        boardRendered = renderMap(bbb,liveShips)
+        for x,y in shotCoords: boardRendered[x][y] = 0
 
-            #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
-            boardRendered = np.array(boardRendered)
+        #boardRendered[10-int(inp[2])][ltn[inp[1].upper()]] = 0
+        boardRendered = np.array(boardRendered)
 
-            ax.pcolormesh(boardRendered, cmap="hot")
+        if mplo:
+            shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
         
-            #fig.canvas.draw()
+            ax.pcolormesh(boardRendered, cmap="hot")
             plt.draw()
-            maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
-            print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
-            continue
-        elif inp[0].upper() == "S":
-            if len(inp) == 2:
-                liveShips.remove(int(inp[1]))
-            else: print("ERROR")
-            continue
-        elif inp[0].upper() == "H": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 2
-        elif inp[0].upper() == "M": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 1
-        elif inp[0].upper() == "R": bbb[10-int(inp[2:])][ltn[inp[1].upper()]] = 3
-        elif inp == "q": return "{0}_{1}_{2}".format(''.join([str(int(x)) for x in bbb for x in x]),'-'.join([str(x[0])+str(x[1]) for x in shotCoords]),''.join(str(x) for x in liveShips))
-        """
-        BBB is converted to 1d string, each character representing place as number
-        shotCoords is split by -, numbers are put next to eachother as 10 is not used by coord system
-        liveships is string of numbers representing sizes
-        """
-        recentShot = (10-int(inp[2:]),ltn[inp[1].upper()])
-        shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-        plt.draw()
-        if not recentShot in shotCoords:
-            shotCoords.append((10-int(inp[2:]),ltn[inp[1].upper()]))
-            shots+=1
+            plt.pause(0.01)
+
+        #fig.canvas.draw()
+        maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
+        print("Attacking {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+        if maxind in [x for x in hiddenShips for x in x]:
+            bbb[maxind[0]][maxind[1]] = 2
+            print("{1}{0} HIT".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+        else:
+            bbb[maxind[0]][maxind[1]] = 1
+            print("{1}{0} MISS".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+        shots+=1
+        if shots==20: print(allRuns)
+        shotCoords.append(maxind)
+        for s in hiddenShips:
+            if not False in [t in shotCoords for t in s]:
+                liveShips.remove(len(s))
+                hiddenShips.remove(s)
+                print("SIZE {} SHIP SUNK".format(len(s)))
+                for x,y in s: bbb[x][y] = 3
 
 
 if __name__=="__main__":
     #board[7][8] = 2
-    shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4],["Blue", "Red", "Lime", "Yellow"])
+    allRuns = []
+    mplo = True
+    if len(sys.argv) == 2:
+        if sys.argv[1] == "1":
+            mplo = False
 
-    numpyTen = renderMap(np.zeros((10,10)))
+    if mplo:
+        shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4],["Blue", "Red", "Lime", "Yellow"])
+
+        numpyTen = renderMap(np.zeros((10,10)))
 
 
-    matplotlib.rcParams['toolbar'] = 'None'
-    fig, (ax, shotax) = plt.subplots(1,2,figsize=(13,6))
+        matplotlib.rcParams['toolbar'] = 'None'
+        fig, (boardax, ax, shotax) = plt.subplots(1,3,figsize=(18,6))
 
-    #fig.canvas.mpl_connect('key_press_event', press)
-    pcm = ax.pcolormesh(numpyTen,cmap = 'hot')
-    ax.axes.get_xaxis().set_visible(False)
-    ax.axes.get_yaxis().set_visible(False)
-    fig.tight_layout()
+        #fig.canvas.mpl_connect('key_press_event', press)
+        pcm = ax.pcolormesh(numpyTen,cmap = 'hot')
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+        fig.tight_layout()
 
-    shotpcm = shotax.pcolormesh(np.zeros((10,10)), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-    shotax.axes.get_xaxis().set_visible(False)
-    shotax.axes.get_yaxis().set_visible(False)
+        shotpcm = shotax.pcolormesh(np.zeros((10,10)), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        shotax.axes.get_xaxis().set_visible(False)
+        shotax.axes.get_yaxis().set_visible(False)
+    
+        boardax.axes.get_xaxis().set_visible(False)
+        boardax.axes.get_yaxis().set_visible(False)
 
-    fig.canvas.set_window_title('Probability heatmap')
-    print(inpt())
+
+        fig.canvas.set_window_title('Probability heatmap')
+    totaltime = time()
+    inpt()
+    print('Time taken = {} seconds'.format(time() - totaltime))
+    input()
