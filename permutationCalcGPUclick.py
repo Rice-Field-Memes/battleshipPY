@@ -18,12 +18,6 @@ from functools import partial
 
 os.system("cls")
 
-def allCoords(x,y,len,rotate):
-    if rotate:
-        return [(x,a) for a in range(y,y+len)]
-    else:
-        return [(a,y) for a in range(x,x+len)]
-
 def onclick(event):
     ix, iy = event.xdata, event.ydata
     if ix!=None and iy!=None and event.inaxes.label != "sinkbutton":
@@ -62,19 +56,6 @@ board = [[0 for _ in range(10)] for _ in range(10)]
 
 #board[7][7] = 2
 
-def calcShip(len):
-    for x in range(10):
-        for y in range(11-len):
-            aCrds = allCoords(x,y,len,2)
-            if all([board[c[0]][c[1]]==0 for c in aCrds]):
-                for _ in aCrds: boardProb[_[0]][_[1]]+=1
-
-    for x in range(11-len):
-        for y in range(10):
-            aCrds = allCoords(x,y,len,3)
-            if all([board[c[0]][c[1]]==0 for c in aCrds]):
-                for _ in aCrds: boardProb[_[0]][_[1]]+=1
-    return None
 def stringGrid(g):
     f = ""
     for x in g:

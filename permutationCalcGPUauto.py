@@ -33,19 +33,7 @@ def boardFromCoords(coords):
         na[x][y] = 1
     return na
 
-def calcShip(len):
-    for x in range(10):
-        for y in range(11-len):
-            aCrds = allCoords(x,y,len,2)
-            if all([board[c[0]][c[1]]==0 for c in aCrds]):
-                for _ in aCrds: boardProb[_[0]][_[1]]+=1
 
-    for x in range(11-len):
-        for y in range(10):
-            aCrds = allCoords(x,y,len,3)
-            if all([board[c[0]][c[1]]==0 for c in aCrds]):
-                for _ in aCrds: boardProb[_[0]][_[1]]+=1
-    return None
 def stringGrid(g):
     f = ""
     for x in g:
