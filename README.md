@@ -46,3 +46,10 @@ Because this version has the full board to begin with, it includes a third heatm
 This version does not use GPU integration, and therefore has the original code for the simulation  
 The GPU and CPU implementations had to be seperated as Numba Jit has limited support for python's built in functions, meaning that much of the code had to be rewritten  
 This version is not recommended as it is much slower, even compared to a bad graphics card
+
+## Installation
+This project was coded in Python 3.7.2  
+First, install the dependencies  
+`python -m install -r requirements.txt`  
+Then run the Python file  
+`python permutationCalcGPUclick.py`

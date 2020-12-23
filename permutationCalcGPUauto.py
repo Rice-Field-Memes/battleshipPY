@@ -14,10 +14,8 @@ from random import getrandbits
 from time import time,sleep
 from numba import jit, cuda
 from numba.typed import List
-import colorama
 
 from Ship import Ship
-colorama.init()
 os.system("cls")
 
 boardProb = [[0 for _ in range(10)] for _ in range(10)]

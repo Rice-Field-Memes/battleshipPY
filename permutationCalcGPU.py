@@ -14,9 +14,6 @@ from random import getrandbits
 from time import time
 from numba import jit, cuda
 from numba.typed import List
-import colorama
-
-colorama.init()
 os.system("cls")
 
 def allCoords(x,y,len,rotate):

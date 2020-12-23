@@ -4,8 +4,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import random
-#import cProfile
-#import re
+
 from time import time
 import threading
 import multiprocessing

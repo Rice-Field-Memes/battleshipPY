@@ -10,15 +10,12 @@ matplotlib.use('Qt5agg')
 
 import random
 from random import getrandbits
-#import cProfile
-#import re
 from time import time
 from numba import jit, cuda
 from numba.typed import List
-import colorama
+
 from functools import partial
 
-colorama.init()
 os.system("cls")
 
 def allCoords(x,y,len,rotate):
