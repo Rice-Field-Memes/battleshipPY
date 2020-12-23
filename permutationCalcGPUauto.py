@@ -142,10 +142,55 @@ def readFileSave(filecont):
 def fixCoords(coords):
     return [list(map(lambda xy: (xy[1],xy[0]), e)) for e in coords]
 
+class Simulation:
+    def __init__(self):
+        self.bbb = np.zeros((10,10))
+        self.shotCoords = []
+        self.liveShips = [5,4,3,3,2]
+        self.shots = 0
+    def runSim(self):
+        if simulation.liveShips == []:
+            print("You win!\n{} rounds!".format(self.shots))
+            return
+        boardRendered = renderMap(self.bbb,self.liveShips)
+        for x,y in self.shotCoords: boardRendered[x][y] = 0
+
+        boardRendered = np.array(boardRendered)
+
+        ax.pcolormesh(boardRendered, cmap="hot")
+
+        plt.draw()
+        maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
+        print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+        return
+    def attack(self, xy, result):
+        #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
+        if result == 0: #If removing attack
+            if (xy[1],xy[0]) in self.shotCoords:
+                self.shotCoords.remove((xy[1],xy[0]))
+            self.bbb[xy[1]][xy[0]] = 0
+        else:
+            if not (xy[1],xy[0]) in self.shotCoords:
+                self.shotCoords.append((xy[1],xy[0]))
+                self.shots+=1
+            self.bbb[xy[1]][xy[0]] = result
+        return self.bbb
+    def sinkShip(self,length,_):
+        if length in self.liveShips:
+            self.liveShips.remove(length)
+            print("SIZE {} SHIP SUNK".format(length))
+        return
+    def resetShips(self):
+        self.liveShips = [5,4,3,3,2]
+        print("SHIPS RESET")
+        return
+
 def inpt():
     ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
     #Board
     #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
+
+    simulation = Simulation()
     with open("boardsave","r") as file1:
         hiddenShips = fixCoords(readFileSave(file1.read()))
 
