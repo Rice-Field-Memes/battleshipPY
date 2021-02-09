@@ -9,3 +9,4 @@ realPermutationCalcGPU.py
 *.conf
 boardsave
 trytime.csv
+testPYcuda.py

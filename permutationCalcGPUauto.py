@@ -18,39 +18,34 @@ from numba.typed import List
 from Ship import Ship
 os.system("cls")
 
-boardProb = [[0 for _ in range(10)] for _ in range(10)]
-
-board = [[0 for _ in range(10)] for _ in range(10)]
-
-#board[2][7] = 2
-#board[4][4] = 1
-#board[7][2] = 1
-
-#board[7][7] = 2
 def boardFromCoords(coords):
     na = np.zeros((10,10))
     for x,y in [e for e in coords for e in e]:
         na[x][y] = 1
     return na
 
-
 def stringGrid(g):
     f = ""
     for x in g:
         f+=''.join(["██" if _==1 else "  " for _ in x]) + "\n"
     return f
-@jit(nopython=True,fastmath=True)
+
+#@jit(nopython=True,fastmath=True)
 def shipLoop(len,occupied):
+    #False when the generated board is valid and not on any occupied tile
     shouldRun = True
+    #Each occupied tile
     xocc = [x for x in occupied for x in x]
     while shouldRun:
-        #sh_t = allCoords(int(10*random.random()),int(10*random.random()),len,not getrandbits(1))
+        #Generate random xy coords
         x,y = int(10*random.random()), int(10*random.random())
+        #Generates a list of ship tiles based on xy coords and boolean, bool determines if ship is horizontal or vertical
         sh_t = [(x,a) for a in range(y,y+len)] if not getrandbits(1) else [(a,y) for a in range(x,x+len)]
+        #For each ship tile, checks if it is outside the board or on an occupied piece, if any are then the loop repeats
         shouldRun = True in [c in xocc or c[0]>9 or c[1]>9 for c in sh_t]
     return sh_t
 
-@jit(nopython=True,fastmath=True)
+#@jit(nopython=True,fastmath=True)
 def monteHunt(n, bb, ships):
     # n: recursions, bb: board, 
     #st1 = time()
@@ -190,6 +185,11 @@ def inpt():
     #ax.pcolormesh(np.array(renderMap(bbb)),cmap="hot")
     #plt.draw()
     while True:
+        if shots >= 12:
+            if mplo:
+                plt.pause(0.01)
+            print("\nYou win!\n{} rounds!".format(shots))
+            return
         if liveShips == []:
             if mplo:
                 shotax.pcolormesh(bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)

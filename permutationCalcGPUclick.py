@@ -1,5 +1,6 @@
 from sys import stdout
 import os
+from PyQt5 import QtCore
 
 import numpy as np
 import matplotlib
@@ -13,6 +14,7 @@ from random import getrandbits
 from time import time
 from numba import jit, cuda
 from numba.typed import List
+import argparse
 
 from functools import partial
 
@@ -20,41 +22,29 @@ os.system("cls")
 
 def onclick(event):
     ix, iy = event.xdata, event.ydata
-    if ix!=None and iy!=None and event.inaxes.label != "sinkbutton":
+    if ix!=None and iy!=None and event.inaxes.get_label() != "sinkbutton":
         if event.button == 1:
-            shotax.pcolormesh(simulation.attack((int(ix),int(iy)),2), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-            plt.draw()
+            simulation.attack((int(ix),int(iy)), 2)
         elif event.button == 3:
-            shotax.pcolormesh(simulation.attack((int(ix),int(iy)),1), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-            plt.draw()
+            simulation.attack((int(ix),int(iy)), 1)
 
 def press(event):
 #    print('press', event.key)
     ix, iy = event.xdata, event.ydata
     if event.key == 'x':
-        if ix!=None and iy!=None and event.inaxes.label != "sinkbutton":
-            shotax.pcolormesh(simulation.attack((int(ix),int(iy)),0), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-            plt.draw()
+        if ix!=None and iy!=None and event.inaxes.get_label() != "sinkbutton":
+            simulation.attack((int(ix),int(iy)), 0)
     elif event.key == 'e':
         simulation.runSim()
     elif event.key == 's':
-        if ix!=None and iy!=None and event.inaxes.label != "sinkbutton":
-            shotax.pcolormesh(simulation.attack((int(ix),int(iy)),3), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
-            plt.draw()
+        if ix!=None and iy!=None and event.inaxes.get_label() != "sinkbutton":
+            simulation.attack((int(ix),int(iy)), 3)
     elif event.key == 'p':
         simulation.resetShips()
-
-
-
-boardProb = [[0 for _ in range(10)] for _ in range(10)]
-
-board = [[0 for _ in range(10)] for _ in range(10)]
-
-#board[2][7] = 2
-#board[4][4] = 1
-#board[7][2] = 1
-
-#board[7][7] = 2
+#    elif event.key == 't' and transparent:
+        global opacityn
+#        opacityn = (opacityn-1)%4
+#        win.setWindowOpacity(0.4 + opacityn*0.2)
 
 def stringGrid(g):
     f = ""
@@ -82,12 +72,16 @@ def readSave(inp):
 
 @jit(nopython=True,fastmath=True)
 def shipLoop(len,occupied):
+    #False when the generated board is valid and not on any occupied tile
     shouldRun = True
+    #Each occupied tile
     xocc = [x for x in occupied for x in x]
     while shouldRun:
-        #sh_t = allCoords(int(10*random.random()),int(10*random.random()),len,not getrandbits(1))
+        #Generate random xy coords
         x,y = int(10*random.random()), int(10*random.random())
+        #Generates a list of ship tiles based on xy coords and boolean, bool determines if ship is horizontal or vertical
         sh_t = [(x,a) for a in range(y,y+len)] if not getrandbits(1) else [(a,y) for a in range(x,x+len)]
+        #For each ship tile, checks if it is outside the board or on an occupied piece, if any are then the loop repeats
         shouldRun = True in [c in xocc or c[0]>9 or c[1]>9 for c in sh_t]
     return sh_t
 
@@ -144,28 +138,34 @@ def renderMap(board, liveShips=[5,4,3,3,2]):
     return npa(resultTen)
 
 class Simulation:
-    def __init__(self):
+    def __init__(self, ships=[5,4,3,3,2]):
         self.bbb = np.zeros((10,10))
         self.shotCoords = []
-        self.liveShips = [5,4,3,3,2]
+        self.liveShips = ships
         self.shots = 0
+        self.shotpcm = shotax.pcolormesh(self.bbb, cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+        self.pcm = probax.pcolormesh(np.zeros((10,10)),cmap = 'hot', vmin=0, vmax=1)
+        self.aiguess = (0,0)
+
     def runSim(self):
         if simulation.liveShips == []:
             print("You win!\n{} rounds!".format(self.shots))
             return
-        boardRendered = renderMap(self.bbb,self.liveShips)
+        boardRendered = np.array(renderMap(self.bbb,self.liveShips),order='K')
         for x,y in self.shotCoords: boardRendered[x][y] = 0
 
-        boardRendered = np.array(boardRendered)
+        self.aiguess = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
+        selectX, selectY = self.aiguess
 
-        ax.pcolormesh(boardRendered, cmap="hot")
-
+        #Just to add AI guess without permanent change, very annoying
+        tempbbb = self.boardWithGuess()
+        self.pcm.set_array(boardRendered.ravel())
+        self.shotpcm.set_array(tempbbb.ravel())
         plt.draw()
-        maxind = np.unravel_index(boardRendered.argmax(),boardRendered.shape)
-        print("Recommended attack: {1}{0}".format(10-maxind[0], list(ltn.keys())[maxind[1]]))
+        print("Recommended attack: {1}{0}".format(10-selectX, list(ltn.keys())[selectY]))
         return
     def attack(self, xy, result):
-        #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed)
+        #0: not shot, 1: shot missed, 2: shot hit, 3: sunk (treated as missed), 4: AI selection
         if result == 0: #If removing attack
             if (xy[1],xy[0]) in self.shotCoords:
                 self.shotCoords.remove((xy[1],xy[0]))
@@ -175,60 +175,77 @@ class Simulation:
                 self.shotCoords.append((xy[1],xy[0]))
                 self.shots+=1
             self.bbb[xy[1]][xy[0]] = result
-        return self.bbb
+        self.shotpcm.set_array(self.boardWithGuess().ravel())
+        plt.draw()
     def sinkShip(self,length,_):
         if length in self.liveShips:
             self.liveShips.remove(length)
             print("SIZE {} SHIP SUNK".format(length))
         return
     def resetShips(self):
-        self.liveShips = [5,4,3,3,2]
+        self.liveShips = shiplist
         print("SHIPS RESET")
         return
+    def boardWithGuess(self):
+        tempb = np.array(self.bbb)
+        gx, gy = self.aiguess
+        if tempb[gx][gy] == 0: tempb[gx][gy] = 4
+        return tempb
 
 def inpt():
     plt.show()
 
-
 if __name__=="__main__":
-    #board[7][8] = 2
-    shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4],["Blue", "Red", "Lime", "Yellow"])
-    ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
-    numpyTen = renderMap(np.zeros((10,10)))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--ships', dest='shipsArg', default='54332', help='Custom ship sizes. Default value would be "-s 54332"')
+    parser.add_argument("-t", "--transparent", help="Makes window transparent", action="store_true")
+    shipsarg = parser.parse_args().shipsArg
     
-    simulation = Simulation()
+    if not shipsarg.isnumeric() or "0" in shipsarg:
+        parser.ArgumentTypeError('Ships argument must be a list of ship lengths. Example: "-s 54332"')
+    
+    shiplist = [int(x) for x in shipsarg]
+    transparent = parser.parse_args().transparent
+
+    print("Battleship AI")
+    print("Controls:\nlclick - hit\nrclick - miss\nx - reset tile\ns - sink tile\np - reset ships\ne - run simulation")
+
+    shotcolor,shotnorm = colors.from_levels_and_colors([0,1,2,3,4,5],["Blue", "Red", "Lime", "Yellow","White"])
+    ltn = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9}
 
     matplotlib.rcParams['toolbar'] = 'None'
-    fig, (ax, shotax) = plt.subplots(1,2,figsize=(13,6), sharex=True)
-    ax.label = "heatmap"
-    shotax.label = "attackmap"
+    fig, (probax, shotax) = plt.subplots(1,2,figsize=(13,6), sharex=True)
+    opacityn = 3
+
     fig.canvas.mpl_connect('key_press_event', press)
     fig.canvas.mpl_connect('button_press_event', onclick)
 
-    letterAxes = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-    plt.xticks(list(map(lambda x: x+0.5, range(10))), letterAxes)
+    nticks = list(map(lambda x: x+0.5, range(10)))
 
-    ax.axes.set_yticks(list(map(lambda x: x+0.5, range(10))))
-    shotax.axes.set_yticks(list(map(lambda x: x+0.5, range(10))))
-    ax.axes.set_yticklabels(range(1,11)[::-1])
-    shotax.axes.set_yticklabels(range(1,11)[::-1])
-    
-    ax.tick_params(length=0, labelsize=16)
+    plt.xticks(nticks, ltn.keys())
+
+    probax.set(label="heatmap",yticks=nticks,yticklabels=range(1,11)[::-1])
+    shotax.set(label="shotmap",yticks=nticks,yticklabels=range(1,11)[::-1])
+    probax.tick_params(length=0, labelsize=16)
     shotax.tick_params(length=0, labelsize=16)
-
-    ax.xaxis.tick_top()
+    probax.xaxis.tick_top()
     shotax.xaxis.tick_top()
-
-    pcm = ax.pcolormesh(numpyTen,cmap = 'hot')
+    
     fig.tight_layout()
     plt.subplots_adjust(bottom=0.1)
 
+    #win = plt.gcf().canvas.manager.window
+    #win.setWindowOpacity(1)
+    #win.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
+    #win.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
-    shotpcm = shotax.pcolormesh(np.zeros((10,10)), cmap=shotcolor, norm=shotnorm, edgecolors="k", linewidths=1)
+    simulation = Simulation(shiplist)
+    simulation.runSim()
+    print(shiplist)
     sinkButtons = []
-    for i,x in enumerate([5,4,3,2]):
+    for i,x in enumerate(set(shiplist)):
         sinkButtons.append(Button(plt.axes([0.55+0.1*i, 0.01, 0.075, 0.08]),"Sink a {}".format(x)))
         sinkButtons[-1].on_clicked(partial(simulation.sinkShip, x))
-        sinkButtons[-1].ax.label = "sinkbutton"
+        sinkButtons[-1].ax.set_label("sinkbutton")
     fig.canvas.set_window_title('Probability heatmap')
-    print(inpt())
+    inpt()
